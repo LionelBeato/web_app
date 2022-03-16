@@ -4,15 +4,40 @@ use rocket::State;
 use crate::model::Student as Student;
 use crate::model::Id as Id;
 
+use aws_config::meta::region::RegionProviderChain;
+use aws_sdk_dynamodb::{Client, Error};
+
+
 use rocket::serde::json::{Json, Value, json};
+
+const MY_CONST: u32 = 0; 
 
 type StudentList = Mutex<Vec<Student>>; 
 // type Students<'r> = &'r State<StudentList>; 
 type Students<'r> = &'r State<StudentList>; 
 
+async fn get_database() -> Result<(), Error> {
+    let region_provider = RegionProviderChain::default_provider().or_else("us-east-1");
+    let config = aws_config::from_env().region(region_provider).load().await;
+    let client = Client::new(&config); // passing config by reference
+    let resp = client.list_tables().send().await?;
+    
+    println!("Tables:"); 
+
+    let names = resp.table_names().unwrap_or_default(); 
+
+    for name in names {
+        println!(" {}", name); 
+    }
+
+    println!("Found {} tables", names.len());
+    Ok(resp) 
+}
+
 #[get("/")]
-pub fn index() -> &'static str {
-    "Hello, world!"
+pub async fn index() -> Option<String> {
+    get_database().await;
+    Some("wow!".to_string())
 }
 
 #[get("/delay/<seconds>")]
