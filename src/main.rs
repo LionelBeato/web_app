@@ -11,7 +11,8 @@ fn rocket() -> _ {
         routes![
             controller::greeting_controller::index,
             controller::greeting_controller::delay,
-            controller::greeting_controller::get_student
         ],
     )
+    .attach(controller::greeting_controller::stage())
 }
+
