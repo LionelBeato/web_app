@@ -6,9 +6,9 @@ pub type Id = usize;
 
 #[derive(Serialize, Deserialize)]
 #[serde(crate = "rocket::serde")]
-pub struct Student<'r> {
+pub struct Student {
     pub id: Option<Id>, 
     pub active: bool,
-    pub first_name: Cow<'r, str>, 
+    pub first_name: String, 
     pub last_name: String,
 }

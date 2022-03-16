@@ -9,10 +9,10 @@ fn rocket() -> _ {
     rocket::build().mount(
         "/",
         routes![
-            controller::greeting_controller::index,
-            controller::greeting_controller::delay,
+            controller::student_controller::index,
+            controller::student_controller::delay,
         ],
     )
-    .attach(controller::greeting_controller::stage())
+    .attach(controller::student_controller::stage())
 }
 

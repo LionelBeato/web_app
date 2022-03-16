@@ -1,1 +1,1 @@
-pub mod greeting_controller;
+pub mod student_controller;
