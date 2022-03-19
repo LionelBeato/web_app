@@ -1,8 +1,6 @@
 mod controller;
 mod model;
 
-use aws_config::meta::region::RegionProviderChain;
-use aws_sdk_dynamodb::{Client, Error};
 
 #[macro_use]
 extern crate rocket;

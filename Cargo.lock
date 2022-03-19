@@ -2042,6 +2042,7 @@ dependencies = [
  "aws-config",
  "aws-sdk-dynamodb",
  "rocket",
+ "tokio-stream",
 ]
 
 [[package]]
