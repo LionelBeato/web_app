@@ -1,12 +1,14 @@
-use rocket::tokio::time::{sleep, Duration};
+use rocket::futures::TryFutureExt;
+// use rocket::tokio::time::{sleep, Duration};
 use rocket::tokio::sync::Mutex;
 use rocket::State;
 use crate::model::Student as Student;
 use crate::model::Id as Id;
 use tokio_stream::StreamExt;
 use std::collections::HashMap;
-use aws_sdk_dynamodb::model::AttributeValue;
+use aws_sdk_dynamodb::model::{AttributeValue, Select};
 use aws_sdk_dynamodb::types::SdkError;
+use aws_sdk_dynamodb::client::fluent_builders::Query;
 use aws_config::meta::region::RegionProviderChain;
 use aws_sdk_dynamodb::{Client, Error};
 
@@ -68,40 +70,49 @@ async fn all_items(client: &Client, table: &str) -> Result<Vec<Student>, Error> 
 
 #[get("/")]
 pub async fn index() -> Option<Value> {
-    
+
     let client = get_database().await.unwrap();
     let students = all_items(&client, "student").await.ok()?; 
 
     Some(json!(students))
 }
 
-#[get("/delay/<seconds>")]
-pub async fn delay(seconds: u64) -> String {
-    sleep(Duration::from_secs(seconds)).await;
-    format!("Waited for {} seconds", seconds)
+#[get("/<id>")]
+async fn get(id: Id) -> Json<Student> {
+
+    let client = get_database().await.unwrap();
+
+    let q = client.query()
+          .table_name("student")
+          .key_condition_expression("#id = :id")
+          .expression_attribute_names("#id", "id")
+          .expression_attribute_values(":id", AttributeValue::S(id.to_string()))
+          .select(Select::AllAttributes)
+          .send()
+          .await;
+
+    let unwrapped = q.unwrap(); 
+
+
+    let student = unwrapped.items().unwrap().get(0).unwrap();
+
+    // json!({"hello":"world!"})
+    Json(Student {
+        id: Some(str::parse(student.get("id").unwrap().as_s().unwrap()).unwrap()),
+        active: student.get("active").unwrap().as_bool().unwrap().clone(),
+        first_name: student.get("first_name").unwrap().as_s().unwrap().to_string(),
+        last_name: student.get("last_name").unwrap().as_s().unwrap().to_string(),
+    })
 }
 
-#[get("/<id>", format = "json")]
-async fn get(id: Id, list:Students<'_>) -> Option<Json<Student>> {
+// #[post("/", format = "json", data = "<student>")]
+// async fn new(student: Json<Student>, list: Students<'_>) -> Value {
+//     let mut list = list.lock().await;
+//     let id = list.len();
 
-    let list = list.lock().await; 
-
-    Some(Json(Student {
-        id: Some(id),
-        active: list.get(id)?.active,
-        first_name: list.get(id)?.first_name.to_string(),
-        last_name: list.get(id)?.last_name.to_string(),
-    }))
-}
-
-#[post("/", format = "json", data = "<student>")]
-async fn new(student: Json<Student>, list: Students<'_>) -> Value {
-    let mut list = list.lock().await;
-    let id = list.len();
-
-    list.push(student.into_inner()); 
-    json!({"status": "ok", "id": id})
-}
+//     list.push(student.into_inner()); 
+//     json!({"status": "ok", "id": id})
+// }
 
 #[catch(404)]
 fn not_found() -> Value {
@@ -113,7 +124,7 @@ fn not_found() -> Value {
 
 pub fn stage() -> rocket::fairing::AdHoc {
     rocket::fairing::AdHoc::on_ignite("JSON", |rocket| async {
-        rocket.mount("/student", routes![new, get])
+        rocket.mount("/student", routes![get, index])
         .register("/student", catchers![not_found])
         .manage(StudentList::new(vec![]))
     })

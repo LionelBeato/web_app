@@ -14,7 +14,6 @@ async fn rocket() -> _ {
         "/",
         routes![
             controller::student_controller::index,
-            controller::student_controller::delay,
         ],
     )
     .attach(controller::student_controller::stage())
