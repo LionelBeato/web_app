@@ -15,9 +15,8 @@ use aws_sdk_dynamodb::{Client, Error};
 
 use rocket::serde::json::{Json, Value, json};
 
-type StudentList = Mutex<Vec<Student>>; 
+// type StudentList = Mutex<Vec<Student>>; 
 // type Students<'r> = &'r State<StudentList>; 
-type Students<'r> = &'r State<StudentList>; 
 
 async fn get_database() -> Result<Client, Error> {
     let region_provider = RegionProviderChain::default_provider().or_else("us-east-1");
@@ -77,11 +76,16 @@ pub async fn index() -> Option<Value> {
     Some(json!(students))
 }
 
-#[get("/<id>")]
-async fn get(id: Id) -> Json<Student> {
+#[get("/hello?wave&<name>")]
+fn hello(name: Option<String>) -> String {
+    name.map(|name| format!("Hi, {}!", name))
+        .unwrap_or_else(|| "Hello!".into())
+}
+
+#[get("/?<id>&<first_name>&<last_name>")]
+async fn getByQuery(id: Id, first_name: String, last_name:String) -> Json<Student> {
 
     let client = get_database().await.unwrap();
-
     let q = client.query()
           .table_name("student")
           .key_condition_expression("#id = :id")
@@ -92,11 +96,8 @@ async fn get(id: Id) -> Json<Student> {
           .await;
 
     let unwrapped = q.unwrap(); 
-
-
     let student = unwrapped.items().unwrap().get(0).unwrap();
 
-    // json!({"hello":"world!"})
     Json(Student {
         id: Some(str::parse(student.get("id").unwrap().as_s().unwrap()).unwrap()),
         active: student.get("active").unwrap().as_bool().unwrap().clone(),
@@ -104,15 +105,6 @@ async fn get(id: Id) -> Json<Student> {
         last_name: student.get("last_name").unwrap().as_s().unwrap().to_string(),
     })
 }
-
-// #[post("/", format = "json", data = "<student>")]
-// async fn new(student: Json<Student>, list: Students<'_>) -> Value {
-//     let mut list = list.lock().await;
-//     let id = list.len();
-
-//     list.push(student.into_inner()); 
-//     json!({"status": "ok", "id": id})
-// }
 
 #[catch(404)]
 fn not_found() -> Value {
@@ -124,7 +116,7 @@ fn not_found() -> Value {
 
 pub fn stage() -> rocket::fairing::AdHoc {
     rocket::fairing::AdHoc::on_ignite("JSON", |rocket| async {
-        rocket.mount("/student", routes![get, index])
+        rocket.mount("/student", routes![getByQuery, index, hello])
         .register("/student", catchers![not_found])
         .manage(StudentList::new(vec![]))
     })
